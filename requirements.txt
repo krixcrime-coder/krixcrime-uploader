@@ -1,0 +1,12 @@
+Flask
+pycryptodome
+requests
+protobuf
+PyJWT
+aiohttp
+crypto
+protobuf
+protobuf-decoder
+pycryptodome
+pytelegrambotapi
+pytz
