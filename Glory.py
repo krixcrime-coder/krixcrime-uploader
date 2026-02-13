@@ -29,7 +29,7 @@ from telebot import types
 import asyncio
 
 # Initialize Telegram bot
-bot = telebot.TeleBot("8353427667:AAHEQx5rsv_i1wEBcYjLorocu4Ly2QEdvm0")
+bot = telebot.TeleBot("8564699489:AAEL-6LRJ7oh9Nccye9gP_rGRorQcj35wt4")
 
 
 
@@ -1012,8 +1012,8 @@ def run_bot():
     
     # Run multiple accounts in parallel
     tasks = []
-    # Using a small batch to avoid being rate-limited or banned too quickly
-    for acc in accounts[:5]:  
+    # Try accounts from the middle and end of the file to find fresh ones
+    for acc in accounts[1000:1010]:  
         tasks.append(run_forever(acc['uid'], acc['password']))
     
     loop.run_until_complete(asyncio.gather(*tasks))
