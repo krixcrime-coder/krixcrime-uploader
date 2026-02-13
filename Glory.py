@@ -995,7 +995,7 @@ async def run_forever(uid, password):
 
 def get_accounts():
     try:
-        with open('attached_assets/accounts_1770997287855.json', 'r') as f:
+        with open('attached_assets/success-MULTI_1770999137095.json', 'r') as f:
             return json.load(f)
     except Exception as e:
         print(f"Error loading accounts: {e}")
@@ -1027,14 +1027,18 @@ if __name__ == '__main__':
         asyncio.set_event_loop(loop)
         
         async def run_until_valid():
-            # Shuffle accounts to try different ones
-            random.shuffle(accounts)
-            for account in accounts:
+            # Filter for activated accounts first
+            activated_accounts = [acc for acc in accounts if acc.get('status') == 'activated']
+            remaining_accounts = [acc for acc in accounts if acc.get('status') != 'activated']
+            
+            # Combine them, prioritizing activated ones
+            prioritized_accounts = activated_accounts + remaining_accounts
+            
+            for account in prioritized_accounts:
                 uid = account['uid']
                 password = account['password']
                 print(f"Trying bot with UID: {uid}")
-                # We use start_bot because it handles the logic and reconnects
-                # But here we want to try another account if it's banned
+                
                 open_id, access_token = await get_access_token(uid, password)
                 if not open_id or not access_token:
                     print(f"Invalid Account: {uid}")
