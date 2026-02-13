@@ -49,9 +49,9 @@ outputType = "console"
 name = "Glory Bot Workflow"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python Glory.py"
-
-[workflows.workflow.metadata]
-outputType = "console"

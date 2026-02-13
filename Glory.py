@@ -1019,9 +1019,41 @@ def run_bot():
     loop.run_until_complete(asyncio.gather(*tasks))
 
 if __name__ == '__main__':
-    import threading
-    bot_thread = threading.Thread(target=run_bot)
-    bot_thread.daemon = True
-    bot_thread.start()
-    bot.infinity_polling()
-    app.run(host='Loacal', port=port)
+    accounts = get_accounts()
+    if not accounts:
+        print("No accounts found.")
+    else:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        async def run_until_valid():
+            # Shuffle accounts to try different ones
+            random.shuffle(accounts)
+            for account in accounts:
+                uid = account['uid']
+                password = account['password']
+                print(f"Trying bot with UID: {uid}")
+                # We use start_bot because it handles the logic and reconnects
+                # But here we want to try another account if it's banned
+                open_id, access_token = await get_access_token(uid, password)
+                if not open_id or not access_token:
+                    print(f"Invalid Account: {uid}")
+                    continue
+                
+                payload = await MajorLoginProto_Encode(open_id, access_token)
+                MajorLoginResponse = await MajorLogin(payload)
+                if not MajorLoginResponse:
+                    print(f"Account {uid} banned or not registered. Trying next...")
+                    continue
+                
+                # If we get here, the account seems valid for login
+                print(f"Valid account found: {uid}. Starting bot...")
+                await run_forever(uid, password)
+                break
+
+        try:
+            loop.run_until_complete(run_until_valid())
+        except KeyboardInterrupt:
+            print("Bot stopped.")
+        except Exception as e:
+            print(f"Bot failed: {e}")
