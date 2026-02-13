@@ -1038,6 +1038,10 @@ if __name__ == '__main__':
                 uid = account['uid']
                 password = account['password']
                 print(f"Trying bot with UID: {uid}")
+                try:
+                    bot.send_message(8564699489, f"🔄 Trying account UID: {uid}")
+                except:
+                    pass
                 
                 open_id, access_token = await get_access_token(uid, password)
                 if not open_id or not access_token:
@@ -1052,6 +1056,10 @@ if __name__ == '__main__':
                 
                 # If we get here, the account seems valid for login
                 print(f"Valid account found: {uid}. Starting bot...")
+                try:
+                    bot.send_message(8564699489, f"✅ Valid account found: {uid}. Starting bot!")
+                except:
+                    pass
                 await run_forever(uid, password)
                 break
 
