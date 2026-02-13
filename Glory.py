@@ -993,11 +993,30 @@ async def run_forever(uid, password):
     while True:
         await start_bot(uid, password)
 
+def get_accounts():
+    try:
+        with open('attached_assets/accounts_1770997287855.json', 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Error loading accounts: {e}")
+        return []
+
 def run_bot():
-    asyncio.run(run_forever(
-        "4355935440",
-        "JOBAYAR_KRLKS"
-    ))
+    accounts = get_accounts()
+    if not accounts:
+        print("No accounts found.")
+        return
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    # Run multiple accounts in parallel
+    tasks = []
+    # Using a small batch to avoid being rate-limited or banned too quickly
+    for acc in accounts[:5]:  
+        tasks.append(run_forever(acc['uid'], acc['password']))
+    
+    loop.run_until_complete(asyncio.gather(*tasks))
 
 if __name__ == '__main__':
     import threading
