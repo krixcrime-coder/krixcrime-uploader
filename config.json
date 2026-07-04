@@ -1,0 +1,12 @@
+{
+  "upload_times": ["09:00", "13:00", "17:00", "20:00", "22:30"],
+  "title": "Common fixed title for every video",
+  "description": "Common fixed description for every video",
+  "tags": ["tag1", "tag2", "tag3"],
+  "watermark": {
+    "x_percent": 75,
+    "y_percent": 85,
+    "width_percent": 15
+  },
+  "drive_folder_url": "https://drive.google.com/drive/u/0/mobile/folders/XXXX"
+}

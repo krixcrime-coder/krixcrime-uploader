@@ -1,0 +1,76 @@
+name: YouTube Auto Uploader
+
+on:
+  schedule:
+    - cron: '0 9 * * *'
+    - cron: '0 13 * * *'
+    - cron: '0 17 * * *'
+    - cron: '0 20 * * *'
+    - cron: '30 22 * * *'
+  workflow_dispatch:
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install google-auth google-auth-httplib2 google-api-python-client
+
+      - name: Pull latest state before running
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions Bot"
+          git pull origin main --rebase || true
+
+      - name: Check if it's time to upload
+        id: check_time
+        run: |
+          python3 -c "
+          import json, datetime, sys
+          with open('config.json') as f:
+              cfg = json.load(f)
+          now = datetime.datetime.utcnow()
+          current_hhmm = now.strftime('%H:%M')
+          times = cfg.get('upload_times', [])
+          for t in times:
+              hour, minute = t.split(':')
+              scheduled = datetime.datetime(now.year, now.month, now.day, int(hour), int(minute))
+              diff = abs((now - scheduled).total_seconds())
+              if diff <= 1800:
+                  print(f'Time match: {t} (diff={diff:.0f}s)')
+                  print('SHOULD_UPLOAD=true')
+                  sys.exit(0)
+          print(f'No matching upload time for {current_hhmm}')
+          print('SHOULD_UPLOAD=false')
+          "
+        env:
+          TZ: UTC
+
+      - name: Run upload script
+        if: contains(steps.check_time.outputs.stdout, 'SHOULD_UPLOAD=true') || github.event_name == 'workflow_dispatch'
+        run: python3 scripts/main.py
+        env:
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          DRIVE_CREDENTIALS_JSON: ${{ secrets.DRIVE_CREDENTIALS_JSON }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GITHUB_REPOSITORY: ${{ github.repository }}

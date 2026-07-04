@@ -1,5 +1,5 @@
 entrypoint = "main.py"
-modules = ["python-3.11"]
+modules = ["python-3.11", "nodejs-20"]
 
 [nix]
 channel = "stable-25_05"
@@ -28,30 +28,20 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Main Bot Workflow"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Glory Bot Workflow"
+args = "Start application"
 
 [[workflows.workflow]]
-name = "Main Bot Workflow"
+name = "Start application"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python main.py"
+args = "npm run dev"
+waitForPort = 5000
 
 [workflows.workflow.metadata]
-outputType = "console"
+outputType = "webview"
 
-[[workflows.workflow]]
-name = "Glory Bot Workflow"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python Glory.py"
+[[ports]]
+localPort = 5000
+externalPort = 80
