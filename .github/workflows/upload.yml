@@ -35,7 +35,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --quiet --upgrade pip
-          pip install google-auth google-auth-httplib2 google-api-python-client
+          pip install google-auth google-auth-httplib2 google-api-python-client requests
 
       - name: Pull latest state before running
         run: |
@@ -93,9 +93,9 @@ jobs:
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
           YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
           YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
-          DRIVE_CREDENTIALS_JSON: ${{ secrets.DRIVE_CREDENTIALS_JSON }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           GH_PAT: ${{ secrets.GH_PAT }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          REPO_NAME: ${{ github.repository }}
 
       - name: Upload summary
         if: always()
