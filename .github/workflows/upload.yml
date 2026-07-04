@@ -2,12 +2,15 @@ name: YouTube Auto Uploader
 
 on:
   schedule:
-    - cron: '0 9 * * *'
-    - cron: '0 13 * * *'
-    - cron: '0 17 * * *'
-    - cron: '0 20 * * *'
-    - cron: '30 22 * * *'
+    # These times are checked against config.json upload_times at runtime
+    # GitHub Actions runs every hour; the script checks if it's time to upload
+    - cron: '0 * * * *'
   workflow_dispatch:
+    inputs:
+      force_upload:
+        description: 'Force upload even if not scheduled'
+        required: false
+        default: 'false'
 
 jobs:
   upload:
@@ -27,11 +30,11 @@ jobs:
           python-version: '3.11'
 
       - name: Install FFmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg
 
       - name: Install Python dependencies
         run: |
-          pip install --upgrade pip
+          pip install --quiet --upgrade pip
           pip install google-auth google-auth-httplib2 google-api-python-client
 
       - name: Pull latest state before running
@@ -43,29 +46,48 @@ jobs:
       - name: Check if it's time to upload
         id: check_time
         run: |
-          python3 -c "
+          RESULT=$(python3 - <<'EOF'
           import json, datetime, sys
-          with open('config.json') as f:
-              cfg = json.load(f)
+
+          try:
+              with open('config.json') as f:
+                  cfg = json.load(f)
+          except Exception as e:
+              print(f"ERROR reading config.json: {e}", file=sys.stderr)
+              print("SHOULD_UPLOAD=false")
+              sys.exit(0)
+
           now = datetime.datetime.utcnow()
-          current_hhmm = now.strftime('%H:%M')
           times = cfg.get('upload_times', [])
+          force = "${{ github.event.inputs.force_upload }}" == "true"
+
+          if force:
+              print(f"Manual trigger with force=true")
+              print("SHOULD_UPLOAD=true")
+              sys.exit(0)
+
           for t in times:
-              hour, minute = t.split(':')
-              scheduled = datetime.datetime(now.year, now.month, now.day, int(hour), int(minute))
-              diff = abs((now - scheduled).total_seconds())
-              if diff <= 1800:
-                  print(f'Time match: {t} (diff={diff:.0f}s)')
-                  print('SHOULD_UPLOAD=true')
-                  sys.exit(0)
-          print(f'No matching upload time for {current_hhmm}')
-          print('SHOULD_UPLOAD=false')
-          "
-        env:
-          TZ: UTC
+              try:
+                  hour, minute = map(int, t.split(':'))
+                  scheduled = datetime.datetime(now.year, now.month, now.day, hour, minute)
+                  diff_mins = abs((now - scheduled).total_seconds()) / 60
+                  if diff_mins <= 30:
+                      print(f"Time match: {t} (diff={diff_mins:.1f} min)")
+                      print("SHOULD_UPLOAD=true")
+                      sys.exit(0)
+              except Exception as e:
+                  print(f"Bad time format '{t}': {e}", file=sys.stderr)
+
+          current_hhmm = now.strftime('%H:%M')
+          print(f"No matching upload time for {current_hhmm} UTC (configured: {times})")
+          print("SHOULD_UPLOAD=false")
+          EOF
+          )
+          echo "$RESULT"
+          echo "$RESULT" >> $GITHUB_OUTPUT
 
       - name: Run upload script
-        if: contains(steps.check_time.outputs.stdout, 'SHOULD_UPLOAD=true') || github.event_name == 'workflow_dispatch'
+        if: contains(steps.check_time.outputs.SHOULD_UPLOAD, 'true') || github.event_name == 'workflow_dispatch'
         run: python3 scripts/main.py
         env:
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
@@ -74,3 +96,13 @@ jobs:
           DRIVE_CREDENTIALS_JSON: ${{ secrets.DRIVE_CREDENTIALS_JSON }}
           GH_PAT: ${{ secrets.GH_PAT }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+
+      - name: Upload summary
+        if: always()
+        run: |
+          echo "### Upload Run Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time (UTC):** $(date -u '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
+          if [ -f uploaded_log.json ]; then
+            LAST=$(python3 -c "import json; log=json.load(open('uploaded_log.json')); e=log[-1] if log else {}; print(f'Status: {e.get(\"status\",\"N/A\")} | File: {e.get(\"file_name\",\"N/A\")} | YT: {e.get(\"youtube_url\",\"N/A\")}')" 2>/dev/null || echo "No log entry")
+            echo "- **Last entry:** $LAST" >> $GITHUB_STEP_SUMMARY
+          fi

@@ -1,47 +1,62 @@
-import path from 'path'
-import fs from 'fs'
 import { isAuthenticated } from './auth'
 
-const LOG_PATH = path.join(process.cwd(), 'uploaded_log.json')
-const USED_PATH = path.join(process.cwd(), 'used_video_ids.json')
+const GITHUB_API = 'https://api.github.com'
 
-function loadLogs() {
-  try {
-    const data = JSON.parse(fs.readFileSync(LOG_PATH, 'utf8'))
-    return Array.isArray(data) ? data : []
-  } catch {
-    return []
+function getGithubHeaders() {
+  const token = process.env.GH_PAT
+  if (!token) throw new Error('GH_PAT environment variable is not set')
+  return {
+    Authorization: `token ${token}`,
+    Accept: 'application/vnd.github.v3+json'
   }
 }
 
-function loadUsedIds() {
+function getRepo() {
+  const repo = process.env.GITHUB_REPOSITORY
+  if (!repo) throw new Error('GITHUB_REPOSITORY is not set')
+  return repo
+}
+
+async function getJsonFromGithub(repo, filePath, fallback) {
+  const res = await fetch(`${GITHUB_API}/repos/${repo}/contents/${filePath}`, {
+    headers: getGithubHeaders()
+  })
+  if (res.status === 404) return fallback
+  if (!res.ok) return fallback
+  const data = await res.json()
   try {
-    return JSON.parse(fs.readFileSync(USED_PATH, 'utf8'))
+    return JSON.parse(Buffer.from(data.content, 'base64').toString('utf8'))
   } catch {
-    return {}
+    return fallback
   }
 }
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   if (!isAuthenticated(req)) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
   if (req.method === 'GET') {
-    const logs = loadLogs()
-    const usedIds = loadUsedIds()
-    const reversed = [...logs].reverse()
+    const repo = getRepo()
+
+    const [logs, usedIds] = await Promise.all([
+      getJsonFromGithub(repo, 'uploaded_log.json', []),
+      getJsonFromGithub(repo, 'used_video_ids.json', {})
+    ])
+
+    const safeLog = Array.isArray(logs) ? logs : []
+    const reversed = [...safeLog].reverse()
 
     const today = new Date().toISOString().split('T')[0]
     const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]
 
     const stats = {
-      total: logs.length,
-      success: logs.filter(l => l.status === 'success').length,
-      failed: logs.filter(l => l.status === 'failed').length,
-      today_uploads: logs.filter(l => l.date === today && l.status === 'success').length,
-      today_failed: logs.filter(l => l.date === today && l.status === 'failed').length,
-      week_uploads: logs.filter(l => l.date >= weekAgo && l.status === 'success').length,
+      total: safeLog.length,
+      success: safeLog.filter(l => l.status === 'success').length,
+      failed: safeLog.filter(l => l.status === 'failed').length,
+      today_uploads: safeLog.filter(l => l.date === today && l.status === 'success').length,
+      today_failed: safeLog.filter(l => l.date === today && l.status === 'failed').length,
+      week_uploads: safeLog.filter(l => l.date >= weekAgo && l.status === 'success').length,
       total_videos_used: Object.keys(usedIds).length,
       in_progress: Object.values(usedIds).filter(v => v.status === 'in_progress').length
     }
