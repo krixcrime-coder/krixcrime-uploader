@@ -1,0 +1,130 @@
+# YouTube Auto Video Uploader — Project Spec / Build Prompt
+
+## 1. Project Overview
+Build a fully automated **YouTube Auto Video Uploader** tool that:
+- Is hosted and run entirely via **GitHub** (repo + GitHub Actions for scheduling/automation — no manual trigger needed).
+- Picks videos automatically from a **Google Drive folder** (which contains multiple sub-folders with 15,000+ videos total).
+- Processes each video (adds a watermark + appends a fixed outro clip).
+- Uploads the processed video to a single YouTube channel with a common title, description, and tags.
+- Runs automatically on a schedule (3–5 uploads/day) with no human intervention.
+- Comes with a simple web **dashboard** to control settings (times, description, tags, history).
+
+## 2. Tech Stack
+- **Language:** Python (best fit for YouTube Data API, Google Drive API, FFmpeg processing, and native GitHub Actions support).
+- **Automation:** GitHub Actions (scheduled via `cron` in workflow YAML) — runs the script automatically at set times, no manual run required.
+- **Video processing:** FFmpeg (installed in the GitHub Actions runner) — used for watermark overlay + outro append.
+- **Dashboard:** A lightweight web app (e.g., Next.js/React frontend + a small backend API) hosted for **free** (e.g., Vercel/Render/Netlify free tier). Dashboard reads/writes a config file (JSON) stored in the GitHub repo via the GitHub API, so GitHub Actions always picks up the latest settings.
+- **Data storage:** JSON files committed back to the repo (no paid database needed):
+  - `config.json` → upload times, title, description, tags
+  - `uploaded_log.json` → history of uploaded videos (ID, date, time, filename)
+  - `used_video_ids.json` → tracks every Drive file ID already uploaded, to prevent duplicates
+
+## 3. Source: Google Drive Structure
+- One main Drive folder URL, containing multiple sub-folders (e.g., `Folder (1-500)`, `Folder (501-1000)`, ... up to 15,000+ videos total).
+- **Selection logic:**
+  1. Randomly pick a sub-folder.
+  2. Randomly pick a video file inside it.
+  3. Check `used_video_ids.json` — if already uploaded, pick again.
+  4. Once a fresh video is found, download it temporarily to the GitHub Actions runner.
+- Access via **Google Drive API** (needs its own service account JSON key or OAuth credentials — separate from the YouTube credentials).
+
+## 4. Video Processing (before upload)
+1. **Watermark:** Overlay a fixed logo image (provided by user, stored in repo, e.g. `assets/watermark.png`) onto every video using FFmpeg (position/opacity configurable, e.g. bottom-right corner, semi-transparent).
+2. **Outro:** Append a fixed 1-second outro clip (provided by user, stored in repo, e.g. `assets/outro.mp4`) to the end of every video using FFmpeg concat.
+3. Output a final processed video file, ready for upload.
+
+## 5. YouTube Upload
+- Uses **YouTube Data API v3**.
+- Auth: OAuth2 (Client ID + Client Secret + a one-time-generated **Refresh Token**, since GitHub Actions runs unattended and can't do interactive login each time).
+- Refresh Token is generated **once** (e.g., via a Google Colab notebook doing the interactive OAuth login), then stored permanently as a GitHub Secret — it does NOT need to be regenerated monthly.
+- ⚠️ **Critical setup requirement:** The Google Cloud project's **OAuth Consent Screen must be set to "In Production"** status (not "Testing"). In Testing mode, Google forces refresh tokens to expire after 7 days, which would break the automation weekly. Moving to Production (even without full Google verification, since this is single-user/personal use) makes the refresh token permanent. The one-time consent login will show an "unverified app" warning — click "Advanced → Go to app" to proceed; this only needs to be done once.
+- All uploads go to a **single YouTube channel**.
+- **Title:** One fixed common title, used as-is for every upload (as configured in `config.json`).
+- **Description:** One fixed common description, same for every upload.
+- **Tags:** One fixed common tag set, same for every upload.
+- After successful upload: log entry added to `uploaded_log.json`, and the video's Drive file ID added to `used_video_ids.json`, then both files committed back to the repo (via GitHub Actions bot commit) so state persists across runs.
+
+### 5.1 Duplicate-Upload / Restart-Safety Guarantee
+To make sure a video is **never uploaded twice**, even if the workflow is edited, interrupted, or restarted mid-run:
+- The moment a video is selected (before processing/upload even starts), its Drive file ID is immediately written to `used_video_ids.json` with status `"in_progress"`, and committed back to the repo right away.
+- Only after a confirmed successful YouTube upload is the status updated to `"uploaded"` with the YouTube video ID/link.
+- On every new run, the script always checks `used_video_ids.json` first — any ID already marked `in_progress` or `uploaded` is skipped, so a restart/edit can never cause a resend of the same video.
+- This acts as a simple **lock file mechanism**: even if two runs somehow overlap, the committed "in_progress" state prevents the same video from being picked twice.
+
+## 6. Scheduling
+- 3–5 uploads per day, at times defined in `config.json` (editable via dashboard).
+- GitHub Actions workflow uses multiple `cron` schedules (or a single frequent cron that checks `config.json` for "is it time to upload now") to trigger the upload script automatically — no manual run ever needed.
+
+## 7. Dashboard Features
+A **password-protected** web dashboard (simple login screen, password stored as a hashed secret) with:
+
+### 7.1 Reporting / Logs
+- Full table of every upload attempt: date, time, source Drive folder, filename, Drive file ID, YouTube video ID/link, **status (Success / Failed)**, and the **exact error message** if it failed.
+- Daily/weekly counts (how many uploaded, how many failed).
+- Filter/search by date, folder, or status.
+
+### 7.2 Settings Control
+- Edit the daily upload times (adds/edits `config.json` cron times) — 3–5 slots.
+- Edit the common title, description, and tags (applied to every future upload).
+- (Optional) Manually trigger an upload instantly.
+
+### 7.3 Visual Watermark Position Editor (key feature)
+- A dedicated screen showing a **9:16 preview canvas** (representing the video frame).
+- The watermark image is rendered on this canvas as a **draggable, resizable box**.
+- User drags the watermark to the desired position and resizes it as needed.
+- On save, the box's position and size are stored as **relative percentages** (e.g., `x: 75%, y: 85%, width: 15%`) in `config.json` — NOT fixed pixels, so it works correctly regardless of each video's actual resolution.
+- The video-processing script (FFmpeg) reads these percentages and calculates the exact pixel overlay position/size for each video at upload time, so the watermark always lands exactly where it was set on the 9:16 preview.
+
+## 8. Credentials / Secrets Required (store as GitHub Repo Secrets — never hardcode)
+| Secret Name | Purpose |
+|---|---|
+| `YT_CLIENT_ID` | YouTube OAuth Client ID |
+| `YT_CLIENT_SECRET` | YouTube OAuth Client Secret |
+| `YT_REFRESH_TOKEN` | Generated once via OAuth consent flow, used for unattended auth |
+| `DRIVE_CREDENTIALS_JSON` | Google Drive API service account key (JSON) |
+| `GH_PAT` | GitHub Personal Access Token (so the Action can commit updated log/config files back to repo, and so the dashboard backend can read/write repo files) |
+| `DASHBOARD_PASSWORD_HASH` | Hashed password for dashboard login |
+| `SESSION_SECRET` | Random secret used to sign dashboard login sessions/cookies |
+
+## 9. `config.json` Example Structure
+```json
+{
+  "upload_times": ["09:00", "13:00", "17:00", "20:00", "22:30"],
+  "title": "Common fixed title for every video",
+  "description": "Common fixed description for every video",
+  "tags": ["tag1", "tag2", "tag3"],
+  "watermark": {
+    "x_percent": 75,
+    "y_percent": 85,
+    "width_percent": 15
+  },
+  "drive_folder_url": "https://drive.google.com/drive/u/0/mobile/folders/XXXX"
+}
+```
+
+> ⚠️ Note: Client ID/Secret shared earlier in chat should be moved into GitHub Secrets immediately and treated as sensitive; regenerate them in Google Cloud Console if they were ever exposed publicly.
+
+## 10. Repo Structure (suggested)
+```
+/assets
+  watermark.png
+  outro.mp4
+/scripts
+  drive_utils.py       # pick + download random unused video
+  process_video.py     # ffmpeg watermark + outro merge
+  upload_youtube.py    # OAuth + upload logic
+  main.py              # orchestrates the full flow
+/dashboard
+  (frontend + small API to edit config.json via GitHub API)
+config.json
+uploaded_log.json
+used_video_ids.json
+.github/workflows/upload.yml   # cron schedule triggering main.py
+```
+
+## 11. One-Time Setup Needed From User
+1. In the existing Google Cloud project (already created by user), confirm **YouTube Data API v3** and **Google Drive API** are both enabled.
+2. Go to **OAuth Consent Screen** settings and change **Publishing status from "Testing" to "In Production"** — this is essential so the Refresh Token never expires (see section 5).
+3. Generate the **Refresh Token** once — easiest via a Google Colab notebook that runs the OAuth flow (login with the Gmail account that owns the YouTube channel), copy the resulting refresh token, and save it as a GitHub Secret. This is a **one-time step**, not repeated monthly.
+4. Create a **Service Account** for Drive API access, download its JSON key, and **share the main Drive folder** with that service account's email address (view access is enough).
+5. Add all secrets (Client ID, Client Secret, Refresh Token, Drive service account JSON, GitHub PAT, dashboard password hash, session secret) to GitHub repo → Settings → Secrets and variables → Actions.
