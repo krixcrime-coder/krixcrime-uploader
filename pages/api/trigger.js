@@ -10,10 +10,10 @@ export default async function handler(req, res) {
   }
 
   const ghToken = process.env.GH_PAT
-  const repo = process.env.GITHUB_REPOSITORY
+  const repo = process.env.REPO_NAME
 
   if (!ghToken || !repo) {
-    return res.status(400).json({ error: 'GH_PAT and GITHUB_REPOSITORY must be set to trigger uploads' })
+    return res.status(400).json({ error: 'GH_PAT and REPO_NAME must be set to trigger uploads' })
   }
 
   try {

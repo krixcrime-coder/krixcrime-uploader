@@ -12,8 +12,8 @@ function getGithubHeaders() {
 }
 
 function getRepo() {
-  const repo = process.env.GITHUB_REPOSITORY
-  if (!repo) throw new Error('GITHUB_REPOSITORY is not set')
+  const repo = process.env.REPO_NAME
+  if (!repo) throw new Error('REPO_NAME is not set')
   return repo
 }
 

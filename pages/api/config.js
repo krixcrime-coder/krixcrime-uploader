@@ -13,8 +13,8 @@ function getGithubHeaders() {
 }
 
 function getRepo() {
-  const repo = process.env.GITHUB_REPOSITORY
-  if (!repo) throw new Error('GITHUB_REPOSITORY environment variable is not set (e.g. username/reponame)')
+  const repo = process.env.REPO_NAME
+  if (!repo) throw new Error('REPO_NAME environment variable is not set (e.g. username/reponame)')
   return repo
 }
 
