@@ -2,11 +2,5 @@
   "framework": "nextjs",
   "buildCommand": "next build",
   "outputDirectory": ".next",
-  "installCommand": "npm install",
-  "env": {
-    "GH_PAT": "@gh_pat",
-    "GITHUB_REPOSITORY": "@github_repository",
-    "DASHBOARD_PASSWORD_HASH": "@dashboard_password_hash",
-    "SESSION_SECRET": "@session_secret"
-  }
+  "installCommand": "npm install"
 }
