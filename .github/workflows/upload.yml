@@ -46,7 +46,7 @@ jobs:
       - name: Check if it's time to upload
         id: check_time
         run: |
-          RESULT=$(python3 - <<'EOF'
+          python3 - <<'EOF'
           import json, datetime, sys
 
           try:
@@ -54,7 +54,8 @@ jobs:
                   cfg = json.load(f)
           except Exception as e:
               print(f"ERROR reading config.json: {e}", file=sys.stderr)
-              print("SHOULD_UPLOAD=false")
+              with open('/tmp/should_upload', 'w') as f:
+                  f.write("false")
               sys.exit(0)
 
           now = datetime.datetime.utcnow()
@@ -63,7 +64,8 @@ jobs:
 
           if force:
               print(f"Manual trigger with force=true")
-              print("SHOULD_UPLOAD=true")
+              with open('/tmp/should_upload', 'w') as f:
+                  f.write("true")
               sys.exit(0)
 
           for t in times:
@@ -73,18 +75,20 @@ jobs:
                   diff_mins = abs((now - scheduled).total_seconds()) / 60
                   if diff_mins <= 30:
                       print(f"Time match: {t} (diff={diff_mins:.1f} min)")
-                      print("SHOULD_UPLOAD=true")
+                      with open('/tmp/should_upload', 'w') as f:
+                          f.write("true")
                       sys.exit(0)
               except Exception as e:
                   print(f"Bad time format '{t}': {e}", file=sys.stderr)
 
           current_hhmm = now.strftime('%H:%M')
           print(f"No matching upload time for {current_hhmm} UTC (configured: {times})")
-          print("SHOULD_UPLOAD=false")
+          with open('/tmp/should_upload', 'w') as f:
+              f.write("false")
           EOF
-          )
-          echo "$RESULT"
-          echo "$RESULT" >> $GITHUB_OUTPUT
+          SHOULD_UPLOAD=$(cat /tmp/should_upload)
+          echo "SHOULD_UPLOAD=$SHOULD_UPLOAD" >> $GITHUB_OUTPUT
+          echo "Should upload: $SHOULD_UPLOAD"
 
       - name: Run upload script
         if: contains(steps.check_time.outputs.SHOULD_UPLOAD, 'true') || github.event_name == 'workflow_dispatch'
