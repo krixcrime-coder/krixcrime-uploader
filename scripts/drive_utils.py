@@ -28,11 +28,15 @@ def list_subfolders(parent_folder_id, api_key):
             'q': f"'{parent_folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false",
             'fields': 'nextPageToken, files(id, name)',
             'key': api_key,
-            'pageSize': 1000
+            'pageSize': 1000,
+            'supportsAllDrives': 'true',
+            'includeItemsFromAllDrives': 'true',
         }
         if page_token:
             params['pageToken'] = page_token
         resp = requests.get('https://www.googleapis.com/drive/v3/files', params=params)
+        if resp.status_code == 403:
+            print(f"403 Forbidden listing subfolders of {parent_folder_id}. Response: {resp.text}")
         resp.raise_for_status()
         data = resp.json()
         results.extend(data.get('files', []))
@@ -49,11 +53,15 @@ def list_videos_in_folder(folder_id, api_key):
             'q': f"'{folder_id}' in parents and mimeType contains 'video/' and trashed=false",
             'fields': 'nextPageToken, files(id, name, size)',
             'key': api_key,
-            'pageSize': 1000
+            'pageSize': 1000,
+            'supportsAllDrives': 'true',
+            'includeItemsFromAllDrives': 'true',
         }
         if page_token:
             params['pageToken'] = page_token
         resp = requests.get('https://www.googleapis.com/drive/v3/files', params=params)
+        if resp.status_code == 403:
+            print(f"403 Forbidden listing videos in {folder_id}. Response: {resp.text}")
         resp.raise_for_status()
         data = resp.json()
         results.extend(data.get('files', []))
