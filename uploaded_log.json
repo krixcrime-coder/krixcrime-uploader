@@ -108,5 +108,16 @@
     "youtube_url": "",
     "status": "failed",
     "error": "403 Client Error: Forbidden for url: https://www.googleapis.com/drive/v3/files?q=%271vAkSCfTcXPen5pDkwMgUmbAOqGQZxfwF%27+in+parents+and+mimeType%3D%27application%2Fvnd.google-apps.folder%27+and+trashed%3Dfalse&fields=nextPageToken%2C+files%28id%2C+name%29&key=AIzaSyDfuRoHFXIguD1kjcy6v49y9aPEr424ogo&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true"
+  },
+  {
+    "date": "2026-07-15",
+    "time": "12:56:10",
+    "folder_name": "",
+    "file_name": "",
+    "drive_file_id": "",
+    "youtube_video_id": "",
+    "youtube_url": "",
+    "status": "failed",
+    "error": "403 Client Error: Forbidden for url: https://www.googleapis.com/drive/v3/files?q=%271vAkSCfTcXPen5pDkwMgUmbAOqGQZxfwF%27+in+parents+and+mimeType%3D%27application%2Fvnd.google-apps.folder%27+and+trashed%3Dfalse&fields=nextPageToken%2C+files%28id%2C+name%29&key=AIzaSyDfuRoHFXIguD1kjcy6v49y9aPEr424ogo&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true"
   }
 ]
